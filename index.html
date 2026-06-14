@@ -531,6 +531,10 @@
           <i data-lucide="file-spreadsheet" style="width:16px; height:16px;"></i>
           Exportar CSV
         </button>
+        <button id="btn-pdf-prof" class="btn btn-secondary">
+          <i data-lucide="users" style="width:16px; height:16px;"></i>
+          PDF por Profissional
+        </button>
         <button id="btn-pdf" class="btn btn-primary">
           <i data-lucide="download" style="width:16px; height:16px;"></i>
           Baixar Relatório (PDF)
@@ -1538,6 +1542,155 @@
       html2pdf().set(opt).from(element).save().then(() => {
         element.style.display = 'none';
       });
+    });
+
+    // ---- PDF separado por profissional ----
+
+    function sanitizeFilename(s) {
+      return (s || 'Profissional').replace(/[^A-Za-zÀ-ÿ0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    // Monta o HTML das seções de guias de UM profissional (mesmo estilo do relatório consolidado)
+    function buildProfDetailSections(p) {
+      const maxGuidesSinglePage = 22;
+      const maxGuidesPerPage = 20;
+      let chunks = [];
+      if (p.guides.length <= maxGuidesSinglePage) {
+        chunks.push(p.guides);
+      } else {
+        for (let i = 0; i < p.guides.length; i += maxGuidesPerPage) {
+          chunks.push(p.guides.slice(i, i + maxGuidesPerPage));
+        }
+      }
+      return chunks.map((chunk, chunkIdx) => {
+        const breakBefore = chunkIdx > 0; // não quebra antes da 1ª seção (evita página em branco)
+        const titleText = chunks.length > 1
+          ? `${p.name} (Código: ${p.code}) - Parte ${chunkIdx + 1}/${chunks.length}`
+          : `${p.name} (Código: ${p.code})`;
+        const isLastChunk = chunkIdx === chunks.length - 1;
+        return `
+          <div style="${breakBefore ? 'page-break-before: always;' : ''}">
+            <h4 style="font-size:11pt; border-bottom:1px solid #ddd; padding-bottom:5px; margin-bottom:10px; margin-top: 10px;">
+              ${titleText}
+            </h4>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 12%">Guia</th>
+                  <th style="width: 32%">Paciente</th>
+                  <th style="width: 11%" class="text-right">Bruto (R$)</th>
+                  <th style="width: 11%" class="text-right">Imposto (R$)</th>
+                  <th style="width: 11%" class="text-right">Líquido (R$)</th>
+                  <th style="width: 11%" class="text-right">Glosa (R$)</th>
+                  <th style="width: 12%">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${chunk.map(g => {
+                  const bruto = g.totals ? g.totals.processado : 0;
+                  const imposto = g.totals ? g.totals.imposto : 0;
+                  const liquido = g.totals ? g.totals.liquido : 0;
+                  const glosa = g.totals ? g.totals.glosa : 0;
+                  const status = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Sem repasse';
+                  return `
+                    <tr>
+                      <td>${g.guia}</td>
+                      <td>${g.patient}</td>
+                      <td class="text-right">${formatBRL(bruto)}</td>
+                      <td class="text-right">${formatBRL(imposto)}</td>
+                      <td class="text-right">${formatBRL(liquido)}</td>
+                      <td class="text-right">${formatBRL(glosa)}</td>
+                      <td>${status}</td>
+                    </tr>
+                  `;
+                }).join('')}
+                ${isLastChunk ? `
+                <tr class="total-row">
+                  <td colspan="2">TOTAL DO PRESTADOR</td>
+                  <td class="text-right">${formatBRL(p.totals.processado)}</td>
+                  <td class="text-right">${formatBRL(p.totals.imposto)}</td>
+                  <td class="text-right">${formatBRL(p.totals.liquido)}</td>
+                  <td class="text-right">${formatBRL(p.totals.glosa)}</td>
+                  <td></td>
+                </tr>
+                ` : ''}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Preenche o #print-template com os dados de UM profissional
+    function fillPrintTemplateForProfessional(p, taxRate) {
+      document.getElementById('print-date').textContent = new Date().toLocaleDateString('pt-BR');
+      document.getElementById('print-tax-rate').textContent = taxRate;
+
+      document.getElementById('print-total-bruto').textContent = formatBRL(p.totals.processado);
+      document.getElementById('print-total-imposto').textContent = formatBRL(p.totals.imposto);
+      document.getElementById('print-total-liquido').textContent = formatBRL(p.totals.liquido);
+      document.getElementById('print-total-glosa').textContent = formatBRL(p.totals.glosa);
+
+      document.querySelector('#print-table-professionals tbody').innerHTML = `
+        <tr>
+          <td>${p.code}</td>
+          <td><strong>${p.name}</strong></td>
+          <td class="text-right">${formatBRL(p.totals.processado)}</td>
+          <td class="text-right">${formatBRL(p.totals.imposto)}</td>
+          <td class="text-right" style="color:green; font-weight:bold;">${formatBRL(p.totals.liquido)}</td>
+          <td class="text-right" style="color:red;">${formatBRL(p.totals.glosa)}</td>
+        </tr>
+      `;
+
+      document.getElementById('print-detail-sections').innerHTML =
+        `<h3 style="font-size: 12pt; margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 5px;">Detalhamento de Guias</h3>`
+        + buildProfDetailSections(p);
+    }
+
+    document.getElementById('btn-pdf-prof').addEventListener('click', async () => {
+      if (!parsedData || parsedData.length === 0) return;
+
+      const btn = document.getElementById('btn-pdf-prof');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+
+      const taxRate = parseFloat(taxRateInput.value) || 0;
+      const companyName = sanitizeFilename(detectedCompany || 'Planos_de_Saude');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const element = document.getElementById('print-template');
+      const titleEl = document.getElementById('print-report-title');
+      const originalTitle = titleEl.textContent;
+
+      try {
+        for (let i = 0; i < parsedData.length; i++) {
+          const p = parsedData[i];
+          btn.innerHTML = `Gerando ${i + 1}/${parsedData.length}...`;
+
+          titleEl.textContent = `Demonstrativo ${detectedCompany} — ${p.name}`;
+          fillPrintTemplateForProfessional(p, taxRate);
+          element.style.display = 'block';
+
+          const opt = {
+            margin: 10,
+            filename: `Repasse_${sanitizeFilename(p.name)}_${companyName}_${dateStr}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+          };
+
+          await html2pdf().set(opt).from(element).save();
+          element.style.display = 'none';
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao gerar PDFs por profissional: ' + err.message);
+      } finally {
+        element.style.display = 'none';
+        titleEl.textContent = originalTitle;
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+        lucide.createIcons();
+      }
     });
   </script>
 </body>
