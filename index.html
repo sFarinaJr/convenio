@@ -1091,7 +1091,7 @@
       const events = [];
       
       // 1. Find professionals (Executantes)
-      const profRegex = /PROFISSIONAL EXECUTANTE:\s*(\d{5,12})\s*\-\s*([A-ZÀ-Úa-z\s\.\-]+?)(?=\s|$|\n)/gi;
+      const profRegex = /PROFISSIONAL EXECUTANTE:\s*(\d{5,12})\s*\-\s*([A-ZÀ-Úa-z\s\.\-]+?)(?=\s+GTOS|\s+GTO\b|\n|$)/gi;
       let match;
       while ((match = profRegex.exec(text)) !== null) {
         events.push({
@@ -1103,7 +1103,7 @@
       }
       
       // 2. Find GTO headers
-      const gtoHeaderRegex = /GTO\s*\:\s*(\d{5,12})\s+CÓDIGO\s+E\s+NOME\s+DO\s+BENEFICIÁRIO\s*\:\s*(\d+)\s*\-\s*([A-ZÀ-Úa-z\s\.\-]+?)(?=\s*(?:CÓDIGO|TOTAL|GTO|OBSERVAÇÕES|STATUS|FACE|DT|$|\n))/gi;
+      const gtoHeaderRegex = /GTO\s*\:\s*(\d{5,12})\s+CÓDIGO\s+E\s+NOME\s+DO\s+BENEFICIÁRIO\s*\:\s*(\d+)\s*\-\s*([A-ZÀ-Úa-z\s\.\-]+?)(?=\s*(?:CÓDIGO|VALOR|UNIMED|TOTAL|GTO|OBSERVAÇÕES|STATUS|FACE|DT|$|\n))/gi;
       while ((match = gtoHeaderRegex.exec(text)) !== null) {
         events.push({
           type: 'guide_header',
