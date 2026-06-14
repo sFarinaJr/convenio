@@ -405,6 +405,7 @@
     .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
     .badge-danger { background: rgba(244, 63, 94, 0.15); color: var(--danger); }
     .badge-warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .badge-neutral { background: rgba(148, 163, 184, 0.15); color: var(--text-muted); }
 
     /* Print Template Styles */
     #print-template {
@@ -803,34 +804,13 @@
     }
 
     function detectCompanyName(text) {
-      const upperText = text.toUpperCase();
-      if (upperText.includes('UNIMED SAUDE E ODONTO') || upperText.includes('UNIMED SAÚDE E ODONTO')) {
-        return 'Unimed Saúde e Odonto';
-      }
-      if (upperText.includes('UNIMED')) {
-        return 'Unimed';
-      }
-      if (upperText.includes('MEDISERVICE')) {
-        return 'Mediservice';
-      }
-      if (upperText.includes('ODONTOPREV')) {
-        return 'Odontoprev';
-      }
-      if (upperText.includes('SULAMÉRICA') || upperText.includes('SUL AMERICA')) {
-        return 'SulAmérica';
-      }
-      if (upperText.includes('AMIL')) {
-        return 'Amil';
-      }
-      if (upperText.includes('BRADESCO')) {
-        return 'Bradesco';
-      }
-      if (upperText.includes('PORTO SEGURO')) {
-        return 'Porto Seguro';
-      }
-      if (upperText.includes('GOLDEN CROSS')) {
-        return 'Golden Cross';
-      }
+      // Usa o nome real da operadora que aparece no próprio PDF.
+      // 1) Formato TISS: ...Período de Processamento <registro ANS> <NOME OPERADORA> <CNPJ>
+      let m = text.match(/Nome da Operadora[\s\S]{0,120}?Processamento\s+[\d.\-]+\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\.,&\-]+?)\s+\d{2}\.\d{3}\.\d{3}\/\d{4}/);
+      if (m) return m[1].replace(/\s+/g, ' ').trim();
+      // 2) Fallback (ex.: Unimed): <NOME> S.A./LTDA imediatamente antes de "CNPJ/MF"
+      let u = text.match(/([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]+?(?:S\.?\s?A\.?|LTDA))\s+CNPJ\/MF/i);
+      if (u) return u[1].replace(/\s+/g, ' ').trim();
       return 'Planos de Saúde';
     }
 
@@ -1321,15 +1301,15 @@
         const wrapper = document.createElement('div');
         wrapper.className = 'prof-accordion';
         
-        const activeGuides = p.guides.filter(g => g.totals && g.totals.processado > 0).length;
-        const cancelledGuides = p.guides.filter(g => !g.totals || g.totals.processado === 0).length;
+        const comRepasse = p.guides.filter(g => g.totals && g.totals.processado > 0).length;
+        const semRepasse = p.guides.filter(g => !g.totals || g.totals.processado === 0).length;
 
         wrapper.innerHTML = `
           <div class="prof-header">
             <h3><i data-lucide="user" style="width:18px; height:18px;"></i> ${p.name}</h3>
             <div class="prof-header-metrics">
-              <span class="text-success"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> ${activeGuides} Ativas</span>
-              <span class="text-danger"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> ${cancelledGuides} Canceladas</span>
+              <span class="text-success"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> ${comRepasse} com repasse</span>
+              <span style="color: var(--text-muted);"><i data-lucide="minus-circle" style="width:14px; height:14px;"></i> ${semRepasse} sem repasse</span>
               <i data-lucide="chevron-down" class="arrow-icon"></i>
             </div>
           </div>
@@ -1353,8 +1333,8 @@
                     const imposto = g.totals ? g.totals.imposto : 0;
                     const liquido = g.totals ? g.totals.liquido : 0;
                     const glosa = g.totals ? g.totals.glosa : 0;
-                    const statusClass = bruto > 0 ? (glosa > 0 ? 'badge-warning' : 'badge-success') : 'badge-danger';
-                    const statusText = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Cancelada';
+                    const statusClass = bruto > 0 ? (glosa > 0 ? 'badge-warning' : 'badge-success') : 'badge-neutral';
+                    const statusText = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Sem repasse';
 
                     return `
                       <tr>
@@ -1401,7 +1381,7 @@
           const imposto = g.totals ? g.totals.imposto : 0;
           const liquido = g.totals ? g.totals.liquido : 0;
           const glosa = g.totals ? g.totals.glosa : 0;
-          const status = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Cancelada';
+          const status = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Sem repasse';
 
           csvContent += `"${p.code}";"${p.name}";"${g.guia}";"${g.patient}";"${bruto.toFixed(2)}";"${imposto.toFixed(2)}";"${liquido.toFixed(2)}";"${glosa.toFixed(2)}";"${status}"\n`;
         });
@@ -1511,7 +1491,7 @@
                   const imposto = g.totals ? g.totals.imposto : 0;
                   const liquido = g.totals ? g.totals.liquido : 0;
                   const glosa = g.totals ? g.totals.glosa : 0;
-                  const status = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Cancelada';
+                  const status = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Sem repasse';
                   return `
                     <tr>
                       <td>${g.guia}</td>
