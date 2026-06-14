@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# PDFs de demonstrativos (dados sensíveis — nunca versionar)
+*.pdf
+
+# Editores
+.vscode/
+.idea/
