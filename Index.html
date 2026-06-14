@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demonstrativo de Planos de Saúde - Relatório Sintético</title>
+  <!-- Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- PDF.js via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <!-- html2pdf.js via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-main: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #334155;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #f43f5e;
+      --glow-indigo: rgba(99, 102, 241, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Header styling */
+    header {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    header h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #a5b4fc, #6366f1, #312e81);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    /* Cards and Glassmorphism */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 0 20px var(--glow-indigo);
+    }
+
+    /* File Upload Section */
+    .upload-zone {
+      border: 2px dashed var(--border-color);
+      border-radius: 1rem;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      background: rgba(30, 41, 59, 0.5);
+      transition: border-color 0.3s ease, background-color 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.05);
+    }
+
+    .upload-icon {
+      color: var(--primary);
+      width: 48px;
+      height: 48px;
+    }
+
+    .upload-text {
+      font-size: 1.1rem;
+      font-weight: 500;
+    }
+
+    .upload-subtext {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    /* Config panel */
+    .config-panel {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 1rem;
+      background: rgba(30, 41, 59, 0.8);
+    }
+
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .input-group label {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .input-control {
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      width: 80px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-control:focus {
+      border-color: var(--primary);
+    }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .kpi-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+    }
+
+    .kpi-card.bruto::after { background-color: var(--primary); }
+    .kpi-card.imposto::after { background-color: var(--warning); }
+    .kpi-card.liquido::after { background-color: var(--success); }
+    .kpi-card.glosa::after { background-color: var(--danger); }
+
+    .kpi-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .kpi-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+    }
+
+    .kpi-subtext {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Loading Indicator */
+    .loading-container {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 2rem;
+    }
+
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border-left-color: var(--primary);
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Results layout */
+    .results-layout {
+      display: none;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Buttons block */
+    .actions-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+      border-radius: 0.5rem;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--bg-card-hover);
+    }
+
+    /* Table styling */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.75rem 1rem;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    td {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.875rem;
+    }
+
+    tr:hover td {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .text-right {
+      text-align: right;
+    }
+
+    .text-success { color: var(--success); }
+    .text-danger { color: var(--danger); }
+    .text-warning { color: var(--warning); }
+
+    /* Chart section */
+    .chart-container {
+      height: 300px;
+      position: relative;
+    }
+
+    /* Accordion section */
+    .professional-details {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .prof-accordion {
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+
+    .prof-header {
+      background: var(--bg-card);
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.2s;
+    }
+
+    .prof-header:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .prof-header h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .prof-header-metrics {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.875rem;
+    }
+
+    .prof-header-metrics span {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .prof-content {
+      display: none;
+      padding: 1.5rem;
+      background: rgba(15, 23, 42, 0.4);
+      border-top: 1px solid var(--border-color);
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .prof-content.active {
+      display: flex;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 9999px;
+    }
+
+    .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+    .badge-danger { background: rgba(244, 63, 94, 0.15); color: var(--danger); }
+    .badge-warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+
+    /* Print Template Styles */
+    #print-template {
+      display: none;
+      background: white;
+      color: black;
+      padding: 1.5rem;
+      font-size: 10pt;
+      width: 100%;
+    }
+
+    #print-template * {
+      color: black !important;
+    }
+
+    #print-template h2 {
+      font-size: 16pt;
+      margin-bottom: 1.25rem;
+      border-bottom: 2px solid #000;
+      padding-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    #print-template table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+      table-layout: fixed;
+    }
+
+    #print-template th, #print-template td {
+      border: 1px solid #ddd;
+      padding: 6px 8px;
+      font-size: 9pt;
+      word-wrap: break-word;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #print-template tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    #print-template th {
+      background-color: #f5f5f5;
+      font-weight: bold;
+    }
+
+    #print-template .total-row {
+      font-weight: bold;
+      background-color: #f9f9f9;
+    }
+
+    /* Alert styles */
+    .alert-info {
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      display: flex;
+      gap: 0.75rem;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+    .alert-info i {
+      color: var(--primary);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Accordion Toggle Icon rotate */
+    .arrow-icon {
+      transition: transform 0.2s;
+    }
+    .prof-accordion.active .arrow-icon {
+      transform: rotate(180deg);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1 id="main-title">Demonstrativo de Planos de Saúde</h1>
+      <p>Gerador de Relatório Sintético com Dedução de Imposto por Profissional</p>
+    </header>
+
+    <!-- Configuration Panel -->
+    <div class="card config-panel">
+      <div>
+        <p style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">Parâmetro de Imposto</p>
+        <p style="font-size: 0.75rem; color: var(--text-muted);">Defina a alíquota que será descontada do valor faturado processado bruto.</p>
+      </div>
+      <div class="input-group">
+        <label for="taxRate">Aliquota:</label>
+        <input type="number" id="taxRate" class="input-control" value="11" min="0" max="100" step="0.5">
+        <span style="font-weight: 600; color: var(--text-muted);">%</span>
+      </div>
+    </div>
+
+    <!-- Drag & Drop Upload Zone -->
+    <div id="drop-zone" class="upload-zone">
+      <i data-lucide="file-up" class="upload-icon"></i>
+      <div class="upload-text">Arraste e solte o PDF do demonstrativo aqui</div>
+      <div class="upload-subtext">Ou clique para procurar em seu computador</div>
+      <input type="file" id="file-input" accept="application/pdf" style="display: none;">
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="loading-container">
+      <div class="spinner"></div>
+      <p style="font-weight: 500;" id="loading-status">Lendo arquivo PDF...</p>
+    </div>
+
+    <!-- Results Area -->
+    <div id="results" class="results-layout">
+      <!-- Actions -->
+      <div class="actions-bar">
+        <button id="btn-csv" class="btn btn-secondary">
+          <i data-lucide="file-spreadsheet" style="width:16px; height:16px;"></i>
+          Exportar CSV
+        </button>
+        <button id="btn-pdf" class="btn btn-primary">
+          <i data-lucide="download" style="width:16px; height:16px;"></i>
+          Baixar Relatório (PDF)
+        </button>
+      </div>
+
+      <!-- KPI Summary -->
+      <div class="kpi-grid">
+        <div class="card kpi-card bruto">
+          <span class="kpi-label">Faturado Bruto</span>
+          <span id="kpi-bruto" class="kpi-value">R$ 0,00</span>
+          <span class="kpi-subtext">Valor total processado das guias ativas</span>
+        </div>
+        <div class="card kpi-card imposto">
+          <span class="kpi-label" id="kpi-tax-label">Imposto (11%)</span>
+          <span id="kpi-imposto" class="kpi-value">R$ 0,00</span>
+          <span class="kpi-subtext">Retenção de imposto calculada</span>
+        </div>
+        <div class="card kpi-card liquido">
+          <span class="kpi-label">Repasse Líquido</span>
+          <span id="kpi-liquido" class="kpi-value">R$ 0,00</span>
+          <span class="kpi-subtext">Valor líquido após impostos</span>
+        </div>
+        <div class="card kpi-card glosa">
+          <span class="kpi-label">Total de Glosas</span>
+          <span id="kpi-glosa" class="kpi-value">R$ 0,00</span>
+          <span class="kpi-subtext">Valor glosado pela operadora</span>
+        </div>
+      </div>
+
+      <!-- Chart and Table Section -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem;">
+        <!-- Table -->
+        <div class="card" style="display:flex; flex-direction:column; gap:1rem;">
+          <h2 style="font-size: 1.1rem; font-weight:600;">Relatório Comparativo por Prestador</h2>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Profissional</th>
+                  <th class="text-right">Bruto (R$)</th>
+                  <th class="text-right">Imposto (R$)</th>
+                  <th class="text-right">Líquido (R$)</th>
+                  <th class="text-right">Glosas (R$)</th>
+                </tr>
+              </thead>
+              <tbody id="table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="card" style="display:flex; flex-direction:column; gap:1rem;">
+          <h2 style="font-size: 1.1rem; font-weight:600;">Repasse por Profissional (Líquido vs Glosa)</h2>
+          <div class="chart-container">
+            <canvas id="repasseChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detailed View -->
+      <div class="card" style="display:flex; flex-direction:column; gap:1.5rem;">
+        <div>
+          <h2 style="font-size: 1.1rem; font-weight:600; margin-bottom: 0.25rem;">Detalhamento de Pacientes e Guias</h2>
+          <p style="font-size: 0.875rem; color: var(--text-muted);">Visualize todos os atendimentos atrelados a cada prestador neste lote.</p>
+        </div>
+        <div id="accordion-list" class="professional-details">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Diagnostic Area (shown if parsing yields empty results) -->
+    <div id="diagnostic-zone" class="card" style="display: none; flex-direction: column; gap: 1.5rem; border-color: var(--danger); margin-top: 1.5rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--danger);">
+        <i data-lucide="alert-triangle" style="width: 24px; height: 24px;"></i>
+        <h2 style="font-size: 1.25rem; font-weight: 600;">Nenhum dado financeiro encontrado</h2>
+      </div>
+      <p style="font-size: 0.875rem; line-height: 1.6; color: var(--text-muted);">
+        O arquivo PDF foi lido com sucesso, mas o sistema não conseguiu extrair os dados de repasse. Isso geralmente ocorre por dois motivos:
+      </p>
+      <ul style="font-size: 0.875rem; color: var(--text-muted); padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; list-style-type: disc;">
+        <li><strong>PDF Escaneado (Imagem):</strong> Se o documento foi gerado a partir de um papel físico digitalizado (foto/scanner), ele não possui texto selecionável. O leitor no navegador não faz OCR de imagem.</li>
+        <li><strong>Variação no Formato do PDF:</strong> O demonstrativo pode ter uma formatação de código ou CNPJ diferente dos padrões mapeados.</li>
+      </ul>
+      
+      <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+        <button id="btn-show-raw-text" class="btn btn-secondary">
+          <i data-lucide="eye" style="width:16px; height:16px;"></i>
+          Ver Texto Extraído (Diagnóstico)
+        </button>
+        <button id="btn-reset-diagnostic" class="btn btn-primary">
+          <i data-lucide="arrow-left" style="width:16px; height:16px;"></i>
+          Tentar Outro Arquivo
+        </button>
+      </div>
+
+      <div id="raw-text-container" style="display: none; flex-direction: column; gap: 0.75rem;">
+        <p style="font-size: 0.875rem; font-weight: 600; color: var(--text-main);">Texto Extraído do PDF:</p>
+        <p style="font-size: 0.75rem; color: var(--text-muted);">Se a caixa de texto abaixo estiver vazia, o PDF é realmente uma imagem e não possui texto digitalizado. Se houver texto, copie-o e envie na nossa conversa para que eu possa ajustar o leitor para você!</p>
+        <textarea id="raw-text-area" readonly style="width: 100%; height: 250px; background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 0.5rem; padding: 0.75rem; font-family: monospace; font-size: 0.75rem; resize: vertical; outline: none;"></textarea>
+      </div>
+    </div>
+
+    <!-- Alert / Instruction Panel (visible initially) -->
+    <div id="info-alert" class="alert-info">
+      <i data-lucide="info" style="width: 18px; height: 18px;"></i>
+      <div>
+        <p style="font-weight: 600; color: var(--text-main); margin-bottom: 0.25rem;">Processamento 100% Local</p>
+        <p>Este sistema lê e extrai os dados do PDF de forma totalmente local no seu navegador. Os dados do faturamento não são transmitidos ou guardados em nenhum servidor externo, garantindo segurança e privacidade.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Printable Report Container -->
+  <div id="print-template">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px;">
+      <div>
+        <h2 id="print-report-title" style="margin: 0; border: none; font-size: 16pt;">Demonstrativo de Planos de Saúde - Relatório Sintético</h2>
+        <p style="font-size: 9pt; color: #666; margin: 5px 0 0 0;">Relatório consolidado por profissional prestador</p>
+      </div>
+      <div style="text-align: right;">
+        <p style="font-size: 9pt; font-weight: bold;">Data de Geração: <span id="print-date"></span></p>
+        <p style="font-size: 9pt; color: #666;">Alíquota de Imposto: <span id="print-tax-rate"></span>%</p>
+      </div>
+    </div>
+
+    <h3 style="font-size: 12pt; margin-bottom: 10px;">Resumo Financeiro Geral</h3>
+    <table>
+      <thead>
+        <tr class="total-row">
+          <th>Faturado Bruto (R$)</th>
+          <th>Imposto Dedução (R$)</th>
+          <th>Repasse Líquido (R$)</th>
+          <th>Total de Glosas (R$)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td id="print-total-bruto" style="font-weight: bold; font-size: 11pt;">R$ 0,00</td>
+          <td id="print-total-imposto" style="font-weight: bold; font-size: 11pt;">R$ 0,00</td>
+          <td id="print-total-liquido" style="font-weight: bold; font-size: 11pt; color: green;">R$ 0,00</td>
+          <td id="print-total-glosa" style="font-weight: bold; font-size: 11pt; color: red;">R$ 0,00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size: 12pt; margin-bottom: 10px;">Demonstrativo Consolidado por Profissional</h3>
+    <table id="print-table-professionals">
+      <thead>
+        <tr>
+          <th style="width: 10%">Código</th>
+          <th style="width: 38%">Profissional</th>
+          <th style="width: 13%" class="text-right">Bruto (R$)</th>
+          <th style="width: 13%" class="text-right">Imposto (R$)</th>
+          <th style="width: 13%" class="text-right">Líquido (R$)</th>
+          <th style="width: 13%" class="text-right">Glosas (R$)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Populated via JS -->
+      </tbody>
+    </table>
+
+    <div id="print-detail-sections">
+      <!-- Populated via JS -->
+    </div>
+  </div>
+
+  <!-- Initialize Lucide icons -->
+  <script>
+    lucide.createIcons();
+  </script>
+
+  <!-- JS App Logic -->
+  <script>
+    // PDFJS setup
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+    // State Variables
+    let parsedData = null;
+    let selectedFile = null;
+    let chartInstance = null;
+    let extractedRawText = "";
+    let detectedCompany = "Planos_de_Saude";
+
+    // Elements
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const loadingDiv = document.getElementById('loading');
+    const loadingStatus = document.getElementById('loading-status');
+    const resultsDiv = document.getElementById('results');
+    const taxRateInput = document.getElementById('taxRate');
+    const kpiTaxLabel = document.getElementById('kpi-tax-label');
+
+    const diagnosticZone = document.getElementById('diagnostic-zone');
+    const rawTextContainer = document.getElementById('raw-text-container');
+    const rawTextArea = document.getElementById('raw-text-area');
+    const btnShowRawText = document.getElementById('btn-show-raw-text');
+    const btnResetDiagnostic = document.getElementById('btn-reset-diagnostic');
+
+    // Setup drag and drop
+    dropZone.addEventListener('click', () => fileInput.click());
+    
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    taxRateInput.addEventListener('input', () => {
+      if (selectedFile) {
+        processAndRender();
+      }
+    });
+
+    btnShowRawText.addEventListener('click', () => {
+      const isVisible = rawTextContainer.style.display === 'flex';
+      rawTextContainer.style.display = isVisible ? 'none' : 'flex';
+      if (!isVisible) {
+        rawTextArea.value = extractedRawText || "[NENHUM TEXTO DETECTADO NO PDF. O ARQUIVO PODE SER UMA IMAGEM DIGITALIZADA SEM CAMADA DE TEXTO SELECTÁVEL]";
+      }
+    });
+
+    btnResetDiagnostic.addEventListener('click', () => {
+      resetAppState();
+    });
+
+    function resetAppState() {
+      selectedFile = null;
+      parsedData = null;
+      extractedRawText = "";
+      fileInput.value = "";
+      
+      resultsDiv.style.display = 'none';
+      diagnosticZone.style.display = 'none';
+      loadingDiv.style.display = 'none';
+      rawTextContainer.style.display = 'none';
+      rawTextArea.value = "";
+      dropZone.style.display = 'flex';
+    }
+
+    function handleFile(file) {
+      if (file.type !== 'application/pdf') {
+        alert('Por favor, envie apenas arquivos PDF.');
+        return;
+      }
+      selectedFile = file;
+      processAndRender();
+    }
+
+    function detectCompanyName(text) {
+      const upperText = text.toUpperCase();
+      if (upperText.includes('UNIMED SAUDE E ODONTO') || upperText.includes('UNIMED SAÚDE E ODONTO')) {
+        return 'Unimed Saúde e Odonto';
+      }
+      if (upperText.includes('UNIMED')) {
+        return 'Unimed';
+      }
+      if (upperText.includes('MEDISERVICE')) {
+        return 'Mediservice';
+      }
+      if (upperText.includes('ODONTOPREV')) {
+        return 'Odontoprev';
+      }
+      if (upperText.includes('SULAMÉRICA') || upperText.includes('SUL AMERICA')) {
+        return 'SulAmérica';
+      }
+      if (upperText.includes('AMIL')) {
+        return 'Amil';
+      }
+      if (upperText.includes('BRADESCO')) {
+        return 'Bradesco';
+      }
+      if (upperText.includes('PORTO SEGURO')) {
+        return 'Porto Seguro';
+      }
+      if (upperText.includes('GOLDEN CROSS')) {
+        return 'Golden Cross';
+      }
+      return 'Planos de Saúde';
+    }
+
+    async function processAndRender() {
+      const taxRate = parseFloat(taxRateInput.value) || 0;
+      kpiTaxLabel.textContent = `Imposto (${taxRate}%)`;
+      
+      // Show loading
+      dropZone.style.display = 'none';
+      resultsDiv.style.display = 'none';
+      diagnosticZone.style.display = 'none';
+      loadingDiv.style.display = 'flex';
+      loadingStatus.textContent = 'Carregando e decodificando o PDF...';
+
+      try {
+        const { data, rawText } = await processPDF(selectedFile, taxRate);
+        parsedData = data;
+        extractedRawText = rawText;
+        
+        loadingDiv.style.display = 'none';
+        
+        if (data && data.length > 0) {
+          // Detect and update company names dynamically
+          detectedCompany = detectCompanyName(rawText);
+          document.title = `Demonstrativo ${detectedCompany} - Relatório Sintético`;
+          document.getElementById('main-title').textContent = `Demonstrativo ${detectedCompany}`;
+          document.getElementById('print-report-title').textContent = `Demonstrativo ${detectedCompany} - Relatório Sintético`;
+
+          renderDashboard(data, taxRate);
+          resultsDiv.style.display = 'flex';
+        } else {
+          diagnosticZone.style.display = 'flex';
+          rawTextContainer.style.display = 'flex';
+          rawTextArea.value = extractedRawText || "[NENHUM TEXTO ENCONTRADO NO PDF - O ARQUIVO PODE SER UMA IMAGEM DIGITALIZADA]";
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao processar PDF: ' + err.message);
+        loadingDiv.style.display = 'none';
+        dropZone.style.display = 'flex';
+      }
+    }
+
+    async function processPDF(file, taxRate) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async function() {
+          try {
+            const typedarray = new Uint8Array(this.result);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+            let fullText = "";
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+              loadingStatus.textContent = `Lendo página ${i} de ${pdf.numPages}...`;
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              
+              // Auto-detect if coordinates are rotated by checking page dimensions (landscape vs portrait)
+              const view = page.view || [0, 0, 612, 792];
+              const width = view[2];
+              const height = view[3];
+              const rotate = page.rotate || 0;
+              const isLandscape = (rotate === 90 || rotate === 270) ? (height > width) : (width > height);
+              const isRotated = isLandscape; // In landscape files, visual vertical corresponds to raw horizontal coordinates
+
+              // Sort text items in visual reading order (top-to-bottom, left-to-right)
+              const items = textContent.items.sort((a, b) => {
+                let ax = a.transform[4];
+                let ay = a.transform[5];
+                let bx = b.transform[4];
+                let by = b.transform[5];
+                
+                if (isRotated) {
+                  // Rotated page: raw x represents visual y (top-to-bottom), raw y represents visual x (left-to-right)
+                  if (Math.abs(ax - bx) < 8) {
+                    return ay - by;
+                  }
+                  return ax - bx;
+                } else {
+                  // Normal page: raw y represents visual y (bottom-to-top), raw x represents visual x (left-to-right)
+                  if (Math.abs(ay - by) < 8) {
+                    return ax - bx;
+                  }
+                  return by - ay;
+                }
+              });
+              
+              const pageText = items.map(item => item.str).join(" ");
+              fullText += pageText + "\n--- PAGE_BREAK ---\n";
+            }
+            
+            loadingStatus.textContent = 'Processando dados financeiros...';
+            const data = parseText(fullText, taxRate);
+            resolve({ data, rawText: fullText });
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    function cleanPatientName(name) {
+      if (!name) return "";
+      name = name.trim();
+      
+      // Remove trailing/duplicate "VALOR" words (case-insensitive)
+      name = name.replace(/\bVALOR\b/gi, '').trim();
+      
+      // Clean up extra spacing
+      name = name.replace(/\s+/g, ' ').trim();
+      
+      // If the name is duplicated due to Nome Social + Nome Civil (e.g., "JOAO VICTOR CORREA DE FREITAS JOAO VICTOR CORREA DE FREITAS")
+      const halfLen = Math.floor(name.length / 2);
+      const part1 = name.substring(0, halfLen).trim();
+      const part2 = name.substring(halfLen).trim();
+      
+      if (part1 === part2) {
+        return part1;
+      }
+      return name;
+    }
+
+    function parseText(text, taxRate) {
+      const isUnimed = text.toUpperCase().includes('UNIMED');
+      
+      if (isUnimed) {
+        return parseUnimedText(text, taxRate);
+      } else {
+        return parseOdontoprevText(text, taxRate);
+      }
+    }
+
+    function parseOdontoprevText(text, taxRate) {
+      const events = [];
+      
+      // 1. Find professionals (Case Insensitive, flexible CNPJ/CPF matching)
+      const profRegex = /(\d{5,8})\s+([A-ZÀ-Úa-z\s\.\-]+?)\s+(\d{2}\.\d{3}\.\d{3}\/\d{4}\-\d{2}|\d{3}\.\d{3}\.\d{3}\-\d{2})/gi;
+      let match;
+      while ((match = profRegex.exec(text)) !== null) {
+        events.push({
+          type: 'professional',
+          index: match.index,
+          code: match[1].trim(),
+          name: match[2].trim()
+        });
+      }
+      
+      // 2. Find guide headers (Case Insensitive, flexible digits matching and Dt. Pagto spacing support)
+      const guideHeaderRegex = /(\d{5,12})\s+(\d+)\s+[\s\S]{0,50}?(\d{5,12})\s+([A-ZÀ-Úa-z\s\.\-]+?)\s+(\d{5,12})/gi;
+      while ((match = guideHeaderRegex.exec(text)) !== null) {
+        events.push({
+          type: 'guide_header',
+          index: match.index,
+          docFiscal: match[1].trim(),
+          protocol: match[2].trim(),
+          carteira: match[3].trim(),
+          patient: cleanPatientName(match[4]),
+          guia: match[5].trim()
+        });
+      }
+      
+      // 3. Find guide totals (Case Insensitive, flex distance matching)
+      const guideTotalRegex = /Valor Total Liberado[\s\S]{0,100}?Guia[\s\S]{0,150}?(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\d{1,3}(?:\.\d{3})*,\d{2})/gi;
+      while ((match = guideTotalRegex.exec(text)) !== null) {
+        events.push({
+          type: 'guide_total',
+          index: match.index,
+          informado: parseFloat(match[1].replace(/\./g, '').replace(',', '.')),
+          processado: parseFloat(match[2].replace(/\./g, '').replace(',', '.')),
+          glosa: parseFloat(match[3].replace(/\./g, '').replace(',', '.')),
+          franquia: parseFloat(match[4].replace(/\./g, '').replace(',', '.')),
+          liberado: parseFloat(match[5].replace(/\./g, '').replace(',', '.'))
+        });
+      }
+      
+      events.sort((a, b) => a.index - b.index);
+      
+      const professionals = {};
+      let currentProfessional = null;
+      const activeGuidesQueue = [];
+      
+      for (const event of events) {
+        if (event.type === 'professional') {
+          if (!professionals[event.code]) {
+            professionals[event.code] = {
+              code: event.code,
+              name: event.name.toUpperCase(),
+              guides: [],
+              totals: { informado: 0, processado: 0, glosa: 0, franquia: 0, liberado: 0, imposto: 0, liquido: 0 }
+            };
+          }
+          currentProfessional = professionals[event.code];
+        } else if (event.type === 'guide_header') {
+          const guide = {
+            docFiscal: event.docFiscal,
+            protocol: event.protocol,
+            carteira: event.carteira,
+            patient: event.patient.toUpperCase(),
+            guia: event.guia,
+            totals: null,
+            professionalCode: currentProfessional ? currentProfessional.code : 'DESCONHECIDO'
+          };
+          
+          if (currentProfessional) {
+            currentProfessional.guides.push(guide);
+            activeGuidesQueue.push(guide);
+          }
+        } else if (event.type === 'guide_total') {
+          if (activeGuidesQueue.length > 0) {
+            const guide = activeGuidesQueue.shift();
+            
+            // Calculate tax and net based on Processado (as requested)
+            const impostoVal = parseFloat((event.processado * (taxRate / 100)).toFixed(2));
+            const liquidoVal = parseFloat((event.processado - impostoVal).toFixed(2));
+            
+            guide.totals = {
+              informado: event.informado,
+              processado: event.processado,
+              glosa: event.glosa,
+              franquia: event.franquia,
+              liberado: event.liberado,
+              imposto: impostoVal,
+              liquido: liquidoVal
+            };
+            
+            const prof = professionals[guide.professionalCode];
+            if (prof) {
+              prof.totals.informado += guide.totals.informado;
+              prof.totals.processado += guide.totals.processado;
+              prof.totals.glosa += guide.totals.glosa;
+              prof.totals.franquia += guide.totals.franquia;
+              prof.totals.liberado += guide.totals.liberado;
+              prof.totals.imposto += guide.totals.imposto;
+              prof.totals.liquido += guide.totals.liquido;
+            }
+          }
+        }
+      }
+      
+      // Format number properties
+      for (const code in professionals) {
+        const p = professionals[code];
+        p.totals.informado = parseFloat(p.totals.informado.toFixed(2));
+        p.totals.processado = parseFloat(p.totals.processado.toFixed(2));
+        p.totals.glosa = parseFloat(p.totals.glosa.toFixed(2));
+        p.totals.franquia = parseFloat(p.totals.franquia.toFixed(2));
+        p.totals.liberado = parseFloat(p.totals.liberado.toFixed(2));
+        p.totals.imposto = parseFloat(p.totals.imposto.toFixed(2));
+        p.totals.liquido = parseFloat(p.totals.liquido.toFixed(2));
+      }
+      
+      return Object.values(professionals);
+    }
+
+    function parseUnimedText(text, taxRate) {
+      const events = [];
+      
+      // 1. Find professionals (Executantes)
+      const profRegex = /PROFISSIONAL EXECUTANTE:\s*(\d{5,12})\s*\-\s*([A-ZÀ-Úa-z\s\.\-]+?)(?=\s|$|\n)/gi;
+      let match;
+      while ((match = profRegex.exec(text)) !== null) {
+        events.push({
+          type: 'professional',
+          index: match.index,
+          code: match[1].trim(),
+          name: match[2].trim()
+        });
+      }
+      
+      // 2. Find GTO headers
+      const gtoHeaderRegex = /GTO\s*\:\s*(\d{5,12})\s+CÓDIGO\s+E\s+NOME\s+DO\s+BENEFICIÁRIO\s*\:\s*(\d+)\s*\-\s*([A-ZÀ-Úa-z\s\.\-]+?)(?=\s*(?:CÓDIGO|TOTAL|GTO|OBSERVAÇÕES|STATUS|FACE|DT|$|\n))/gi;
+      while ((match = gtoHeaderRegex.exec(text)) !== null) {
+        events.push({
+          type: 'guide_header',
+          index: match.index,
+          docFiscal: match[1].trim(),
+          protocol: "",
+          carteira: match[2].trim(),
+          patient: cleanPatientName(match[3]),
+          guia: match[1].trim()
+        });
+      }
+      
+      // 3. Find GTO totals (TOTAL DA FICHA)
+      const gtoTotalRegex = /TOTAL\s+DA\s+FICHA\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s+(\d{1,3}(?:\.\d{3})*,\d{2})/gi;
+      while ((match = gtoTotalRegex.exec(text)) !== null) {
+        events.push({
+          type: 'guide_total',
+          index: match.index,
+          informado: parseFloat(match[1].replace(/\./g, '').replace(',', '.')),
+          processado: parseFloat(match[1].replace(/\./g, '').replace(',', '.')),
+          glosa: parseFloat(match[2].replace(/\./g, '').replace(',', '.')),
+          franquia: 0,
+          liberado: parseFloat(match[3].replace(/\./g, '').replace(',', '.'))
+        });
+      }
+      
+      events.sort((a, b) => a.index - b.index);
+      
+      const professionals = {};
+      let currentProfessional = null;
+      const activeGuidesQueue = [];
+      
+      for (const event of events) {
+        if (event.type === 'professional') {
+          if (!professionals[event.code]) {
+            professionals[event.code] = {
+              code: event.code,
+              name: event.name.toUpperCase(),
+              guides: [],
+              totals: { informado: 0, processado: 0, glosa: 0, franquia: 0, liberado: 0, imposto: 0, liquido: 0 }
+            };
+          }
+          currentProfessional = professionals[event.code];
+        } else if (event.type === 'guide_header') {
+          const guide = {
+            docFiscal: event.docFiscal,
+            protocol: event.protocol,
+            carteira: event.carteira,
+            patient: event.patient.toUpperCase(),
+            guia: event.guia,
+            totals: null,
+            professionalCode: currentProfessional ? currentProfessional.code : 'DESCONHECIDO'
+          };
+          
+          if (currentProfessional) {
+            currentProfessional.guides.push(guide);
+            activeGuidesQueue.push(guide);
+          }
+        } else if (event.type === 'guide_total') {
+          if (activeGuidesQueue.length > 0) {
+            const guide = activeGuidesQueue.shift();
+            
+            const impostoVal = parseFloat((event.processado * (taxRate / 100)).toFixed(2));
+            const liquidoVal = parseFloat((event.processado - impostoVal).toFixed(2));
+            
+            guide.totals = {
+              informado: event.informado,
+              processado: event.processado,
+              glosa: event.glosa,
+              franquia: event.franquia,
+              liberado: event.liberado,
+              imposto: impostoVal,
+              liquido: liquidoVal
+            };
+            
+            const prof = professionals[guide.professionalCode];
+            if (prof) {
+              prof.totals.informado += guide.totals.informado;
+              prof.totals.processado += guide.totals.processado;
+              prof.totals.glosa += guide.totals.glosa;
+              prof.totals.franquia += guide.totals.franquia;
+              prof.totals.liberado += guide.totals.liberado;
+              prof.totals.imposto += guide.totals.imposto;
+              prof.totals.liquido += guide.totals.liquido;
+            }
+          }
+        }
+      }
+      
+      // Format number properties
+      for (const code in professionals) {
+        const p = professionals[code];
+        p.totals.informado = parseFloat(p.totals.informado.toFixed(2));
+        p.totals.processado = parseFloat(p.totals.processado.toFixed(2));
+        p.totals.glosa = parseFloat(p.totals.glosa.toFixed(2));
+        p.totals.franquia = parseFloat(p.totals.franquia.toFixed(2));
+        p.totals.liberado = parseFloat(p.totals.liberado.toFixed(2));
+        p.totals.imposto = parseFloat(p.totals.imposto.toFixed(2));
+        p.totals.liquido = parseFloat(p.totals.liquido.toFixed(2));
+      }
+      
+      return Object.values(professionals);
+    }
+
+    function formatBRL(value) {
+      return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function renderDashboard(data, taxRate) {
+      let grandTotalBruto = 0;
+      let grandTotalImposto = 0;
+      let grandTotalLiquido = 0;
+      let grandTotalGlosa = 0;
+
+      data.forEach(p => {
+        grandTotalBruto += p.totals.processado;
+        grandTotalImposto += p.totals.imposto;
+        grandTotalLiquido += p.totals.liquido;
+        grandTotalGlosa += p.totals.glosa;
+      });
+
+      // Render KPIs
+      document.getElementById('kpi-bruto').textContent = formatBRL(grandTotalBruto);
+      document.getElementById('kpi-imposto').textContent = formatBRL(grandTotalImposto);
+      document.getElementById('kpi-liquido').textContent = formatBRL(grandTotalLiquido);
+      document.getElementById('kpi-glosa').textContent = formatBRL(grandTotalGlosa);
+
+      // Render Table
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      
+      data.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight: 500;">${p.name} <br> <span style="font-size: 0.75rem; color: var(--text-muted);">Cod: ${p.code}</span></td>
+          <td class="text-right">${formatBRL(p.totals.processado)}</td>
+          <td class="text-right text-warning">${formatBRL(p.totals.imposto)}</td>
+          <td class="text-right text-success">${formatBRL(p.totals.liquido)}</td>
+          <td class="text-right text-danger">${formatBRL(p.totals.glosa)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Render Chart
+      renderChart(data);
+
+      // Render Detailed view Accordions
+      renderAccordions(data);
+    }
+
+    function renderChart(data) {
+      const ctx = document.getElementById('repasseChart').getContext('2d');
+      
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      const labels = data.map(p => p.name.split(' ')[0] + ' ' + (p.name.split(' ')[1] || ''));
+      const liquidos = data.map(p => p.totals.liquido);
+      const glosas = data.map(p => p.totals.glosa);
+      const impostos = data.map(p => p.totals.imposto);
+
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Líquido Repasse',
+              data: liquidos,
+              backgroundColor: '#10b981',
+              borderRadius: 6
+            },
+            {
+              label: 'Imposto',
+              data: impostos,
+              backgroundColor: '#f59e0b',
+              borderRadius: 6
+            },
+            {
+              label: 'Glosado',
+              data: glosas,
+              backgroundColor: '#f43f5e',
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#f8fafc', font: { family: 'Inter' } }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8' }
+            },
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8' }
+            }
+          }
+        }
+      });
+    }
+
+    function renderAccordions(data) {
+      const container = document.getElementById('accordion-list');
+      container.innerHTML = '';
+
+      data.forEach(p => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'prof-accordion';
+        
+        const activeGuides = p.guides.filter(g => g.totals && g.totals.processado > 0).length;
+        const cancelledGuides = p.guides.filter(g => !g.totals || g.totals.processado === 0).length;
+
+        wrapper.innerHTML = `
+          <div class="prof-header">
+            <h3><i data-lucide="user" style="width:18px; height:18px;"></i> ${p.name}</h3>
+            <div class="prof-header-metrics">
+              <span class="text-success"><i data-lucide="check-circle" style="width:14px; height:14px;"></i> ${activeGuides} Ativas</span>
+              <span class="text-danger"><i data-lucide="x-circle" style="width:14px; height:14px;"></i> ${cancelledGuides} Canceladas</span>
+              <i data-lucide="chevron-down" class="arrow-icon"></i>
+            </div>
+          </div>
+          <div class="prof-content">
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nº Guia</th>
+                    <th>Paciente</th>
+                    <th class="text-right">Bruto (R$)</th>
+                    <th class="text-right">Imposto (R$)</th>
+                    <th class="text-right">Líquido (R$)</th>
+                    <th class="text-right">Glosas (R$)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${p.guides.map(g => {
+                    const bruto = g.totals ? g.totals.processado : 0;
+                    const imposto = g.totals ? g.totals.imposto : 0;
+                    const liquido = g.totals ? g.totals.liquido : 0;
+                    const glosa = g.totals ? g.totals.glosa : 0;
+                    const statusClass = bruto > 0 ? (glosa > 0 ? 'badge-warning' : 'badge-success') : 'badge-danger';
+                    const statusText = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Cancelada';
+
+                    return `
+                      <tr>
+                        <td>${g.guia}</td>
+                        <td style="font-weight: 500;">${g.patient}</td>
+                        <td class="text-right">${formatBRL(bruto)}</td>
+                        <td class="text-right text-warning">${formatBRL(imposto)}</td>
+                        <td class="text-right text-success">${formatBRL(liquido)}</td>
+                        <td class="text-right text-danger">${formatBRL(glosa)}</td>
+                        <td><span class="badge ${statusClass}">${statusText}</span></td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+
+        // Toggle action
+        const header = wrapper.querySelector('.prof-header');
+        const content = wrapper.querySelector('.prof-content');
+        header.addEventListener('click', () => {
+          const isActive = wrapper.classList.toggle('active');
+          content.classList.toggle('active', isActive);
+        });
+
+        container.appendChild(wrapper);
+      });
+      
+      lucide.createIcons();
+    }
+
+    // Export CSV logic
+    document.getElementById('btn-csv').addEventListener('click', () => {
+      if (!parsedData) return;
+      
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Codigo Prestador;Nome Prestador;Guia;Paciente;Bruto;Imposto;Liquido;Glosa;Status\n";
+
+      parsedData.forEach(p => {
+        p.guides.forEach(g => {
+          const bruto = g.totals ? g.totals.processado : 0;
+          const imposto = g.totals ? g.totals.imposto : 0;
+          const liquido = g.totals ? g.totals.liquido : 0;
+          const glosa = g.totals ? g.totals.glosa : 0;
+          const status = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Cancelada';
+
+          csvContent += `"${p.code}";"${p.name}";"${g.guia}";"${g.patient}";"${bruto.toFixed(2)}";"${imposto.toFixed(2)}";"${liquido.toFixed(2)}";"${glosa.toFixed(2)}";"${status}"\n`;
+        });
+      });
+
+      const companyName = detectedCompany || 'Planos_de_Saude';
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Repasse_${companyName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+    // html2pdf Report generator
+    document.getElementById('btn-pdf').addEventListener('click', () => {
+      if (!parsedData) return;
+      
+      // Update print template elements
+      const taxRate = parseFloat(taxRateInput.value) || 0;
+      document.getElementById('print-date').textContent = new Date().toLocaleDateString('pt-BR');
+      document.getElementById('print-tax-rate').textContent = taxRate;
+
+      let grandTotalBruto = 0;
+      let grandTotalImposto = 0;
+      let grandTotalLiquido = 0;
+      let grandTotalGlosa = 0;
+
+      parsedData.forEach(p => {
+        grandTotalBruto += p.totals.processado;
+        grandTotalImposto += p.totals.imposto;
+        grandTotalLiquido += p.totals.liquido;
+        grandTotalGlosa += p.totals.glosa;
+      });
+
+      document.getElementById('print-total-bruto').textContent = formatBRL(grandTotalBruto);
+      document.getElementById('print-total-imposto').textContent = formatBRL(grandTotalImposto);
+      document.getElementById('print-total-liquido').textContent = formatBRL(grandTotalLiquido);
+      document.getElementById('print-total-glosa').textContent = formatBRL(grandTotalGlosa);
+
+      // Populate print table
+      const printTbody = document.querySelector('#print-table-professionals tbody');
+      printTbody.innerHTML = '';
+      parsedData.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.code}</td>
+          <td><strong>${p.name}</strong></td>
+          <td class="text-right">${formatBRL(p.totals.processado)}</td>
+          <td class="text-right">${formatBRL(p.totals.imposto)}</td>
+          <td class="text-right" style="color:green; font-weight:bold;">${formatBRL(p.totals.liquido)}</td>
+          <td class="text-right" style="color:red;">${formatBRL(p.totals.glosa)}</td>
+        `;
+        printTbody.appendChild(tr);
+      });
+
+      // Add detailed sections for printing
+      const printDetails = document.getElementById('print-detail-sections');
+      printDetails.innerHTML = '';
+      
+      const maxGuidesSinglePage = 22;
+      const maxGuidesPerPage = 20;
+      let isFirstSection = true;
+
+      parsedData.forEach(p => {
+        // Chunk guides to handle page breaks neatly
+        let chunks = [];
+        if (p.guides.length <= maxGuidesSinglePage) {
+          chunks.push(p.guides);
+        } else {
+          for (let i = 0; i < p.guides.length; i += maxGuidesPerPage) {
+            chunks.push(p.guides.slice(i, i + maxGuidesPerPage));
+          }
+        }
+
+        chunks.forEach((chunk, chunkIdx) => {
+          const sec = document.createElement('div');
+          sec.style.pageBreakBefore = 'always';
+          
+          const titleText = chunks.length > 1 
+            ? `${p.name} (Código: ${p.code}) - Parte ${chunkIdx + 1}/${chunks.length}`
+            : `${p.name} (Código: ${p.code})`;
+
+          const isLastChunk = chunkIdx === chunks.length - 1;
+
+          sec.innerHTML = `
+            ${isFirstSection ? `<h3 style="font-size: 12pt; margin-bottom: 15px; border-bottom: 1px solid #000; padding-bottom: 5px;">Detalhamento de Guias por Profissional</h3>` : ''}
+            <h4 style="font-size:11pt; border-bottom:1px solid #ddd; padding-bottom:5px; margin-bottom:10px; margin-top: ${isFirstSection ? '10px' : '0px'};">
+              ${titleText}
+            </h4>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 12%">Guia</th>
+                  <th style="width: 32%">Paciente</th>
+                  <th style="width: 11%" class="text-right">Bruto (R$)</th>
+                  <th style="width: 11%" class="text-right">Imposto (R$)</th>
+                  <th style="width: 11%" class="text-right">Líquido (R$)</th>
+                  <th style="width: 11%" class="text-right">Glosa (R$)</th>
+                  <th style="width: 12%">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${chunk.map(g => {
+                  const bruto = g.totals ? g.totals.processado : 0;
+                  const imposto = g.totals ? g.totals.imposto : 0;
+                  const liquido = g.totals ? g.totals.liquido : 0;
+                  const glosa = g.totals ? g.totals.glosa : 0;
+                  const status = bruto > 0 ? (glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Cancelada';
+                  return `
+                    <tr>
+                      <td>${g.guia}</td>
+                      <td>${g.patient}</td>
+                      <td class="text-right">${formatBRL(bruto)}</td>
+                      <td class="text-right">${formatBRL(imposto)}</td>
+                      <td class="text-right">${formatBRL(liquido)}</td>
+                      <td class="text-right">${formatBRL(glosa)}</td>
+                      <td>${status}</td>
+                    </tr>
+                  `;
+                }).join('')}
+                ${isLastChunk ? `
+                <tr class="total-row">
+                  <td colspan="2">TOTAL DO PRESTADOR</td>
+                  <td class="text-right">${formatBRL(p.totals.processado)}</td>
+                  <td class="text-right">${formatBRL(p.totals.imposto)}</td>
+                  <td class="text-right">${formatBRL(p.totals.liquido)}</td>
+                  <td class="text-right">${formatBRL(p.totals.glosa)}</td>
+                  <td></td>
+                </tr>
+                ` : ''}
+              </tbody>
+            </table>
+          `;
+          printDetails.appendChild(sec);
+          isFirstSection = false;
+        });
+      });
+
+      // Run html2pdf
+      const element = document.getElementById('print-template');
+      element.style.display = 'block';
+
+      const companyName = detectedCompany || 'Planos_de_Saude';
+      const opt = {
+        margin:       10,
+        filename:     `Relatorio_Sintetico_Repasse_${companyName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      };
+
+      html2pdf().set(opt).from(element).save().then(() => {
+        element.style.display = 'none';
+      });
+    });
+  </script>
+</body>
+</html>
