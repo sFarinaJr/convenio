@@ -494,8 +494,19 @@
     <header>
       <h1 id="main-title">Demonstrativo de Planos de Saúde</h1>
       <p>Gerador de Relatório Sintético com Dedução de Imposto por Profissional</p>
+      <button type="button" id="btn-settings" class="btn btn-secondary" style="margin-top:1rem;">
+        <i data-lucide="settings" style="width:16px; height:16px;"></i>
+        Configurações
+      </button>
     </header>
 
+    <!-- Configurações (modal) -->
+    <dialog id="settings-dialog" style="background:var(--bg-card, #1e293b); color:inherit; border:1px solid var(--border-color); border-radius:1rem; padding:1.5rem; width:min(900px, 94vw); margin:auto;">
+      <div style="display:flex; flex-direction:column; gap:1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2 style="font-size:1.1rem; font-weight:600;">Configurações</h2>
+          <button type="button" id="btn-settings-close" class="btn btn-primary">Fechar</button>
+        </div>
     <!-- Configuration Panel -->
     <div class="card config-panel">
       <div>
@@ -511,7 +522,7 @@
 
 
     <!-- Parâmetros de envio de e-mail -->
-    <div class="card config-panel" style="flex-wrap:wrap; gap:1rem;">
+    <div class="card config-panel" style="grid-template-columns:1fr; align-items:stretch;">
       <div>
         <p style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">Parâmetro de Envio de E-mail</p>
         <p style="font-size: 0.75rem; color: var(--text-muted);">E-mail que aparece como remetente para o profissional (deve ser um alias "Enviar como" do Gmail da conta que envia; senão vai como resposta-para).</p>
@@ -525,6 +536,9 @@
         <input type="password" id="sendKey" class="input-control" style="width:140px;" placeholder="chave de envio">
       </div>
     </div>
+
+      </div>
+    </dialog>
 
     <!-- Drag & Drop Upload Zone -->
     <div id="drop-zone" class="upload-zone">
@@ -2004,6 +2018,12 @@
     }
     document.getElementById('btn-new').addEventListener('click', resetAppState);
     renderHistory();
+
+    // ---- Modal de configurações ----
+    const settingsDialog = document.getElementById('settings-dialog');
+    document.getElementById('btn-settings').addEventListener('click', () => settingsDialog.showModal());
+    document.getElementById('btn-settings-close').addEventListener('click', () => settingsDialog.close());
+    settingsDialog.addEventListener('click', e => { if (e.target === settingsDialog) settingsDialog.close(); });
   </script>
 </body>
 </html>
