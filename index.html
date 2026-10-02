@@ -1267,6 +1267,7 @@
                 style="flex:1; min-width:0; padding:0.45rem 0.6rem; border-radius:6px; border:1px solid var(--border-color, #334155); background:transparent; color:inherit; font:inherit; font-size:0.8rem;">
               <button type="button" class="btn btn-send-prof" data-code="${p.code}" title="Gerar PDF só deste profissional e enviar" style="white-space:nowrap; padding:0.45rem 0.75rem; font-size:0.8rem;">Enviar PDF</button>
             </div>
+            <div class="prof-status" data-code="${p.code}" style="font-size:0.75rem; margin-top:0.25rem; min-height:1em;"></div>
           </td>
         `;
         tbody.appendChild(tr);
@@ -1818,19 +1819,68 @@
       });
     }
 
+
+    // ---- Verificação de e-mail digitado errado e de e-mail não entregue ----
+    const KNOWN_DOMAINS = ['gmail.com','hotmail.com','outlook.com','yahoo.com','yahoo.com.br','icloud.com','uol.com.br','bol.com.br','terra.com.br','msn.com','live.com','globo.com','ig.com.br'];
+    function editDistance(a, b) {
+      const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+      for (let j = 1; j <= b.length; j++) d[0][j] = j;
+      for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+        d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+      return d[a.length][b.length];
+    }
+    // Retorna e-mail corrigido sugerido, ou null se o domínio parece certo.
+    function suggestEmail(email) {
+      const [user, domain] = email.toLowerCase().split('@');
+      if (KNOWN_DOMAINS.includes(domain)) return null;
+      let best = null, bestD = 3;
+      KNOWN_DOMAINS.forEach(k => { const dist = editDistance(domain, k); if (dist < bestD) { bestD = dist; best = k; } });
+      if (best) return `${user}@${best}`;
+      if (/\.(con|cm|comm|vom|xom|co)$/.test(domain)) return `${user}@${domain.replace(/\.[a-z]+$/, '.com')}`;
+      return null;
+    }
+    function setStatus(code, text, color) {
+      const el = document.querySelector(`.prof-status[data-code="${code}"]`);
+      if (el) { el.textContent = text; el.style.color = color || 'var(--text-muted)'; }
+    }
+    async function checkBounce(code, email, key, tries) {
+      for (let i = 0; i < tries; i++) {
+        await new Promise(r => setTimeout(r, i === 0 ? 20000 : 40000));
+        try {
+          const r = await fetch(MAIL_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ token: key, action: 'bounces', emails: [email] }) });
+          const out = await r.json();
+          if (out.ok && out.bounced.length) {
+            setStatus(code, '✗ NÃO ENTREGUE: o e-mail não existe ou está errado. Corrija e envie de novo.', 'var(--danger)');
+            const inp = document.querySelector(`.prof-email[data-code="${code}"]`);
+            if (inp) inp.style.borderColor = 'var(--danger)';
+            alert(`E-mail NÃO entregue para ${email}. Confira se está escrito certo.`);
+            return;
+          }
+        } catch (e) {}
+      }
+      setStatus(code, '✓ Enviado, sem aviso de falha de entrega.', 'var(--success)');
+    }
+
     document.getElementById('table-body').addEventListener('click', async e => {
       const btn = e.target.closest('.btn-send-prof');
       if (!btn) return;
       const code = btn.dataset.code;
       const p = parsedData.find(x => String(x.code) === String(code));
       const input = document.querySelector(`.prof-email[data-code="${code}"]`);
-      const email = input.value.trim();
+      let email = input.value.trim();
       const key = document.getElementById('sendKey').value.trim();
       const sender = document.getElementById('senderEmail').value.trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         input.focus(); input.style.borderColor = 'var(--danger)'; return;
       }
       input.style.borderColor = '';
+      const fix = suggestEmail(email);
+      if (fix) {
+        if (confirm(`O e-mail "${email}" parece escrito errado.\n\nVocê quis dizer "${fix}"?\n\nOK = corrigir e continuar\nCancelar = revisar o e-mail`)) {
+          input.value = fix;
+          email = fix;
+        } else { input.focus(); input.style.borderColor = 'var(--danger)'; return; }
+      }
       if (!key || !sender) { alert('Preencha Remetente e Chave no Parâmetro de Envio de E-mail.'); return; }
       saveEmail(code, email);
 
@@ -1855,6 +1905,8 @@
         const out = await resp.json();
         if (!out.ok) throw new Error(out.error || 'falha desconhecida');
         btn.textContent = 'Enviado ✓';
+        setStatus(code, 'Enviado. Verificando se foi entregue...', 'var(--text-muted)');
+        checkBounce(code, email, key, 3);
         if (out.replyTo) alert(`Enviado, mas "${out.replyTo}" não é alias do Gmail: saiu de ${out.usedFrom} com resposta para ${out.replyTo}.`);
         setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
         return;
