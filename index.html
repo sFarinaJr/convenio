@@ -509,6 +509,23 @@
       </div>
     </div>
 
+
+    <!-- Parâmetros de envio de e-mail -->
+    <div class="card config-panel" style="flex-wrap:wrap; gap:1rem;">
+      <div>
+        <p style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">Parâmetro de Envio de E-mail</p>
+        <p style="font-size: 0.75rem; color: var(--text-muted);">E-mail que aparece como remetente para o profissional (deve ser um alias "Enviar como" do Gmail da conta que envia; senão vai como resposta-para).</p>
+      </div>
+      <div class="input-group" style="flex-wrap:wrap;">
+        <label for="senderEmail">Remetente:</label>
+        <input type="email" id="senderEmail" class="input-control" style="width:230px;" placeholder="clinica@exemplo.com">
+        <label for="senderName">Nome:</label>
+        <input type="text" id="senderName" class="input-control" style="width:170px;" placeholder="Nome da clínica">
+        <label for="sendKey">Chave:</label>
+        <input type="password" id="sendKey" class="input-control" style="width:140px;" placeholder="chave de envio">
+      </div>
+    </div>
+
     <!-- Drag & Drop Upload Zone -->
     <div id="drop-zone" class="upload-zone">
       <i data-lucide="file-up" class="upload-icon"></i>
@@ -566,7 +583,7 @@
       </div>
 
       <!-- Chart and Table Section -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem;">
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
         <!-- Table -->
         <div class="card" style="display:flex; flex-direction:column; gap:1rem;">
           <h2 style="font-size: 1.1rem; font-weight:600;">Relatório Comparativo por Prestador</h2>
@@ -579,6 +596,7 @@
                   <th class="text-right">Imposto (R$)</th>
                   <th class="text-right">Líquido (R$)</th>
                   <th class="text-right">Glosas (R$)</th>
+                  <th>E-mail do profissional</th>
                 </tr>
               </thead>
               <tbody id="table-body">
@@ -1227,6 +1245,14 @@
           <td class="text-right text-warning">${formatBRL(p.totals.imposto)}</td>
           <td class="text-right text-success">${formatBRL(p.totals.liquido)}</td>
           <td class="text-right text-danger">${formatBRL(p.totals.glosa)}</td>
+          <td>
+            <div style="display:flex; gap:0.5rem; align-items:center; min-width:280px;">
+              <input type="email" class="prof-email" data-code="${p.code}" placeholder="email@exemplo.com"
+                value="${getSavedEmail(p.code).replace(/"/g, '&quot;')}"
+                style="flex:1; min-width:0; padding:0.45rem 0.6rem; border-radius:6px; border:1px solid var(--border-color, #334155); background:transparent; color:inherit; font:inherit; font-size:0.8rem;">
+              <button type="button" class="btn btn-send-prof" data-code="${p.code}" title="Gerar PDF só deste profissional e enviar" style="white-space:nowrap; padding:0.45rem 0.75rem; font-size:0.8rem;">Enviar PDF</button>
+            </div>
+          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -1691,6 +1717,138 @@
         btn.innerHTML = originalHTML;
         lucide.createIcons();
       }
+    });
+
+    // ---- E-mail por profissional ----
+    const EMAILS_KEY = 'convenios_emails_profissionais';
+    function loadEmails() {
+      try { return JSON.parse(localStorage.getItem(EMAILS_KEY)) || {}; } catch (e) { return {}; }
+    }
+    function getSavedEmail(code) { return loadEmails()[code] || ''; }
+    function saveEmail(code, email) {
+      const all = loadEmails();
+      if (email) all[code] = email; else delete all[code];
+      try { localStorage.setItem(EMAILS_KEY, JSON.stringify(all)); } catch (e) {}
+    }
+
+    document.getElementById('table-body').addEventListener('change', e => {
+      if (e.target.classList.contains('prof-email')) saveEmail(e.target.dataset.code, e.target.value.trim());
+    });
+
+    async function generateProfessionalPdf(p, taxRate) {
+      const element = document.getElementById('print-template');
+      const titleEl = document.getElementById('print-report-title');
+      const originalTitle = titleEl.textContent;
+      const filename = `Repasse_${sanitizeFilename(p.name)}_${sanitizeFilename(detectedCompany || 'Planos_de_Saude')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      try {
+        titleEl.textContent = `Demonstrativo ${detectedCompany} — ${p.name}`;
+        fillPrintTemplateForProfessional(p, taxRate);
+        element.style.display = 'block';
+        const blob = await html2pdf().set({
+          margin: 10, filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        }).from(element).outputPdf('blob');
+        return { blob, filename };
+      } finally {
+        element.style.display = 'none';
+        titleEl.textContent = originalTitle;
+      }
+    }
+
+    const MAIL_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxiFYnyj0GQGKAuihG82TfHC5KQstSjc_LlWS87FY0GC_sTHmRTC1Q4bIUe8kpBYhYWDg/exec';
+    const SENDER_FIELDS = { senderEmail: 'convenios_sender_email', senderName: 'convenios_sender_name', sendKey: 'convenios_send_key' };
+    Object.keys(SENDER_FIELDS).forEach(id => {
+      const el = document.getElementById(id);
+      el.value = id === 'senderEmail' ? 'ijanainafarina@gmail.com' : '';
+      try { el.value = localStorage.getItem(SENDER_FIELDS[id]) || el.value; } catch (e) {}
+      el.addEventListener('change', () => { try { localStorage.setItem(SENDER_FIELDS[id], el.value.trim()); } catch (e) {} });
+    });
+
+    function escHtml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+    function buildEmailHtml(p, taxRate) {
+      const th = 'padding:6px 8px;border-bottom:2px solid #ccc;text-align:left;font-size:12px;';
+      const td = 'padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;';
+      const r = ' text-align:right;';
+      const rows = p.guides.map(g => {
+        const t = g.totals || { processado: 0, imposto: 0, liquido: 0, glosa: 0 };
+        const status = t.processado > 0 ? (t.glosa > 0 ? 'Auditada/Glosa' : 'Aprovada') : 'Sem repasse';
+        return `<tr><td style="${td}">${escHtml(g.guia)}</td><td style="${td}">${escHtml(g.patient)}</td>
+          <td style="${td+r}">${formatBRL(t.processado)}</td><td style="${td+r}">${formatBRL(t.imposto)}</td>
+          <td style="${td+r}">${formatBRL(t.liquido)}</td><td style="${td+r}">${formatBRL(t.glosa)}</td><td style="${td}">${status}</td></tr>`;
+      }).join('');
+      return `<div style="font-family:Arial,sans-serif;color:#222;">
+        <p>Olá, <strong>${escHtml(p.name)}</strong>.</p>
+        <p>Segue o seu demonstrativo de repasse — ${escHtml(detectedCompany || '')} (alíquota de imposto: ${taxRate}%). O PDF completo está em anexo.</p>
+        <table style="border-collapse:collapse;margin:12px 0;">
+          <tr><td style="padding:4px 12px 4px 0;">Faturado bruto</td><td style="text-align:right;"><strong>${formatBRL(p.totals.processado)}</strong></td></tr>
+          <tr><td style="padding:4px 12px 4px 0;">Imposto</td><td style="text-align:right;"><strong>${formatBRL(p.totals.imposto)}</strong></td></tr>
+          <tr><td style="padding:4px 12px 4px 0;">Repasse líquido</td><td style="text-align:right;color:#0a7a3d;"><strong>${formatBRL(p.totals.liquido)}</strong></td></tr>
+          <tr><td style="padding:4px 12px 4px 0;">Glosas</td><td style="text-align:right;color:#c0213b;"><strong>${formatBRL(p.totals.glosa)}</strong></td></tr>
+        </table>
+        <table style="border-collapse:collapse;width:100%;">
+          <thead><tr><th style="${th}">Guia</th><th style="${th}">Paciente</th><th style="${th+r}">Bruto</th><th style="${th+r}">Imposto</th><th style="${th+r}">Líquido</th><th style="${th+r}">Glosa</th><th style="${th}">Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+    }
+
+    function blobToBase64(blob) {
+      return new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result).split(',')[1]);
+        fr.onerror = rej;
+        fr.readAsDataURL(blob);
+      });
+    }
+
+    document.getElementById('table-body').addEventListener('click', async e => {
+      const btn = e.target.closest('.btn-send-prof');
+      if (!btn) return;
+      const code = btn.dataset.code;
+      const p = parsedData.find(x => String(x.code) === String(code));
+      const input = document.querySelector(`.prof-email[data-code="${code}"]`);
+      const email = input.value.trim();
+      const key = document.getElementById('sendKey').value.trim();
+      const sender = document.getElementById('senderEmail').value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        input.focus(); input.style.borderColor = 'var(--danger)'; return;
+      }
+      input.style.borderColor = '';
+      if (!key || !sender) { alert('Preencha Remetente e Chave no Parâmetro de Envio de E-mail.'); return; }
+      saveEmail(code, email);
+
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Gerando PDF...';
+      try {
+        const taxRate = parseFloat(taxRateInput.value) || 0;
+        const { blob, filename } = await generateProfessionalPdf(p, taxRate);
+        btn.textContent = 'Enviando...';
+        const resp = await fetch(MAIL_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            token: key, to: email, from: sender,
+            fromName: document.getElementById('senderName').value.trim(),
+            subject: `Demonstrativo de repasse - ${detectedCompany} - ${p.name}`,
+            html: buildEmailHtml(p, taxRate),
+            filename, pdfBase64: await blobToBase64(blob)
+          })
+        });
+        const out = await resp.json();
+        if (!out.ok) throw new Error(out.error || 'falha desconhecida');
+        btn.textContent = 'Enviado ✓';
+        if (out.replyTo) alert(`Enviado, mas "${out.replyTo}" não é alias do Gmail: saiu de ${out.usedFrom} com resposta para ${out.replyTo}.`);
+        setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
+        return;
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao enviar: ' + err.message);
+      }
+      btn.disabled = false;
+      btn.textContent = original;
     });
   </script>
 </body>
