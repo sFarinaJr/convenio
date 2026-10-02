@@ -1943,7 +1943,7 @@
       let list = loadHistory().filter(h => h.id !== sig);
       list.unshift(entry);
       list = list.slice(0, HISTORY_MAX);
-      while (list.length > 1 && !storeHistory(list)) list.pop(); // sem espaço: descarta os mais antigos
+      while (list.length && !storeHistory(list)) list.pop(); // sem espaço: descarta os mais antigos
       renderHistory();
     }
     function renderHistory() {
