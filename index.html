@@ -534,6 +534,12 @@
       <input type="file" id="file-input" accept="application/pdf" style="display: none;">
     </div>
 
+    <!-- Histórico dos últimos relatórios -->
+    <div id="history-card" class="card" style="display:none; flex-direction:column; gap:0.75rem;">
+      <p style="font-weight:600; font-size:0.875rem;">Últimos relatórios processados <span style="font-weight:400; color:var(--text-muted);">(clique para abrir sem reenviar o PDF)</span></p>
+      <div id="history-list" style="display:flex; flex-direction:column; gap:0.5rem;"></div>
+    </div>
+
     <!-- Loading Indicator -->
     <div id="loading" class="loading-container">
       <div class="spinner"></div>
@@ -544,6 +550,10 @@
     <div id="results" class="results-layout">
       <!-- Actions -->
       <div class="actions-bar">
+        <button id="btn-new" class="btn btn-secondary" style="margin-right:auto;">
+          <i data-lucide="arrow-left" style="width:16px; height:16px;"></i>
+          Início / Relatórios recentes
+        </button>
         <button id="btn-csv" class="btn btn-secondary">
           <i data-lucide="file-spreadsheet" style="width:16px; height:16px;"></i>
           Exportar CSV
@@ -787,6 +797,10 @@
     taxRateInput.addEventListener('input', () => {
       if (selectedFile) {
         processAndRender();
+      } else if (parsedData && resultsDiv.style.display !== 'none') {
+        const t = parseFloat(taxRateInput.value) || 0;
+        applyTax(parsedData, t);
+        showReport(parsedData, detectedCompany, t);
       }
     });
 
@@ -863,6 +877,7 @@
 
           renderDashboard(data, taxRate);
           resultsDiv.style.display = 'flex';
+          saveToHistory(data, detectedCompany, taxRate);
         } else {
           diagnosticZone.style.display = 'flex';
           rawTextContainer.style.display = 'flex';
@@ -1850,6 +1865,93 @@
       btn.disabled = false;
       btn.textContent = original;
     });
+
+    // ---- Histórico dos últimos relatórios (localStorage) ----
+    const HISTORY_KEY = 'convenios_historico';
+    const HISTORY_MAX = 10;
+    const historyCard = document.getElementById('history-card');
+    const historyList = document.getElementById('history-list');
+
+    function loadHistory() {
+      try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) { return []; }
+    }
+    function storeHistory(list) {
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); return true; } catch (e) { return false; }
+    }
+    function saveToHistory(data, company, taxRate) {
+      const bruto = data.reduce((a, p) => a + p.totals.processado, 0);
+      const sig = company + '|' + data.map(p => p.code).join(',') + '|' + bruto.toFixed(2);
+      const entry = { id: sig, ts: Date.now(), company, taxRate, bruto, data };
+      let list = loadHistory().filter(h => h.id !== sig);
+      list.unshift(entry);
+      list = list.slice(0, HISTORY_MAX);
+      while (list.length > 1 && !storeHistory(list)) list.pop(); // sem espaço: descarta os mais antigos
+      renderHistory();
+    }
+    function renderHistory() {
+      const list = loadHistory();
+      historyList.innerHTML = '';
+      list.forEach(h => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; gap:0.5rem; align-items:center;';
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'btn btn-secondary';
+        open.style.cssText = 'flex:1; justify-content:space-between; text-align:left; gap:1rem;';
+        const dt = new Date(h.ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+        open.innerHTML = `<span>${escHtml(h.company)} · ${h.data.length} profissionais</span><span style="color:var(--text-muted);">${formatBRL(h.bruto)} · ${dt}</span>`;
+        open.addEventListener('click', () => openFromHistory(h.id));
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'btn btn-secondary';
+        del.title = 'Remover do histórico';
+        del.textContent = '×';
+        del.addEventListener('click', () => { storeHistory(loadHistory().filter(x => x.id !== h.id)); renderHistory(); });
+        row.append(open, del);
+        historyList.appendChild(row);
+      });
+      syncHistoryVisibility();
+    }
+    function syncHistoryVisibility() {
+      historyCard.style.display = (dropZone.style.display !== 'none' && loadHistory().length) ? 'flex' : 'none';
+    }
+    new MutationObserver(syncHistoryVisibility).observe(dropZone, { attributes: true, attributeFilter: ['style'] });
+
+    function applyTax(data, taxRate) {
+      data.forEach(p => {
+        let imp = 0, liq = 0;
+        p.guides.forEach(g => {
+          if (!g.totals) return;
+          g.totals.imposto = parseFloat((g.totals.processado * (taxRate / 100)).toFixed(2));
+          g.totals.liquido = parseFloat((g.totals.processado - g.totals.imposto).toFixed(2));
+          imp += g.totals.imposto; liq += g.totals.liquido;
+        });
+        p.totals.imposto = parseFloat(imp.toFixed(2));
+        p.totals.liquido = parseFloat(liq.toFixed(2));
+      });
+    }
+    function showReport(data, company, taxRate) {
+      parsedData = data;
+      detectedCompany = company;
+      kpiTaxLabel.textContent = `Imposto (${taxRate}%)`;
+      document.title = `Demonstrativo ${company} - Relatório Sintético`;
+      document.getElementById('main-title').textContent = `Demonstrativo ${company}`;
+      document.getElementById('print-report-title').textContent = `Demonstrativo ${company} - Relatório Sintético`;
+      dropZone.style.display = 'none';
+      diagnosticZone.style.display = 'none';
+      renderDashboard(data, taxRate);
+      resultsDiv.style.display = 'flex';
+    }
+    function openFromHistory(id) {
+      const h = loadHistory().find(x => x.id === id);
+      if (!h) return;
+      selectedFile = null;
+      taxRateInput.value = h.taxRate;
+      showReport(JSON.parse(JSON.stringify(h.data)), h.company, h.taxRate);
+      window.scrollTo(0, 0);
+    }
+    document.getElementById('btn-new').addEventListener('click', resetAppState);
+    renderHistory();
   </script>
 </body>
 </html>
